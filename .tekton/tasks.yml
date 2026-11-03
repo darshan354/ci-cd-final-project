@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: oc-pipelines-oc-final
+spec:
+  params:
+    - name: repo-url
+      type: string
+      default: https://github.com/darshan354/ci-cd-final-project
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: cleanup
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: clean
+            image: alpine
+            script: |
+              rm -rf "$(workspaces.source.path)"/*
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: clone
+      runAfter:
+        - cleanup
+      taskSpec:
+        params:
+          - name: repo-url
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: clone
+            image: alpine/git:latest
+            script: |
+              git clone "$(params.repo-url)" "$(workspaces.source.path)"
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: nose
+      runAfter:
+        - clone
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: run-tests
+            image: python:3.9-slim
+            script: |
+              cd "$(workspaces.source.path)"
+              pip install -r requirements.txt
+              nosetests tests/
+      workspaces:
+        - name: source
+          workspace: shared-workspace
